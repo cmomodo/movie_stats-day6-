@@ -1,0 +1,10 @@
+# Ignore .env file 
+.env
+
+# Ignore settings file
+settings.json
+
+# Ignore sample_requests file
+sample_requests.txt
+
+#
