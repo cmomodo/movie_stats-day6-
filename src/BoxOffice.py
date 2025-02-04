@@ -234,5 +234,106 @@ async def get_movies_rating(
         logger.error(f"Error fetching movie ratings: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+#Sort latest movies by genre
+@app.get("/movies/genre", response_class=HTMLResponse)
+async def get_movies_genre(
+    genre: str = Query(
+        default="Action",
+        description="Genre of the movie"
+    ),
+    limit: int = Query(
+        default=5,
+        le=10,
+        description="Number of movies to return (max 10)"
+    )
+):
+    try:
+        logger.info(f"Fetching movies with genre={genre} and limit={limit}")
+
+        movies = imdb_client.get_box_office_movies()
+
+        # Filter movies by genre
+        movies = [m for m in movies if genre in m.genres]
+        movies = movies[:limit]
+
+        # Format data for response
+        formatted_movies = []
+        for movie in movies:
+            formatted_movies.append({
+                "title": movie.primaryTitle,
+                "rating": f"{movie.averageRating:.1f}",
+                "gross": f"${movie.weekendGrossAmount:,.2f}" if movie.weekendGrossAmount else "N/A",
+                "release": movie.startYear,
+                "runtime": f"{movie.runtimeMinutes} min"
+            })
+
+        headers = ["Title", "Rating", "Gross", "Release", "Runtime"]
+        table_data = [
+            [
+                movie["title"],
+                movie["rating"],
+                movie["gross"],
+                movie["release"],
+                movie["runtime"]
+            ] for movie in formatted_movies
+        ]
+        table = tabulate(table_data, headers=headers, tablefmt="grid")
+
+        logger.info(f"Returning {len(formatted_movies)} movies with genre {genre}")
+        return HTMLResponse(content=f"<pre>{table}</pre>")
+
+    except Exception as e:
+        logger.error(f"Error fetching movies by genre: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+#highest weekend opening.
+@app.get("/movies/highest_opening", response_class=HTMLResponse)
+async def get_movies_highest_opening(
+    limit: int = Query(
+        default=5,
+        le=10,
+        description="Number of movies to return (max 10)"
+    )
+):
+    try:
+        logger.info(f"Fetching movies with highest opening and limit={limit}")
+
+        movies = imdb_client.get_box_office_movies()
+
+        # Sort movies based on weekend gross
+        movies = [m for m in movies if m.weekendGrossAmount]
+        movies.sort(key=lambda x: x.weekendGrossAmount, reverse=True)
+        movies = movies[:limit]
+
+        # Format data for response
+        formatted_movies = []
+        for movie in movies:
+            formatted_movies.append({
+                "title": movie.primaryTitle,
+                "rating": f"{movie.averageRating:.1f}",
+                "gross": f"${movie.weekendGrossAmount:,.2f}" if movie.weekendGrossAmount else "N/A",
+                "release": movie.startYear,
+                "runtime": f"{movie.runtimeMinutes} min"
+            })
+
+        headers = ["Title", "Rating", "Gross", "Release", "Runtime"]
+        table_data = [
+            [
+                movie["title"],
+                movie["rating"],
+                movie["gross"],
+                movie["release"],
+                movie["runtime"]
+            ] for movie in formatted_movies
+        ]
+        table = tabulate(table_data, headers=headers, tablefmt="grid")
+
+        logger.info(f"Returning {len(formatted_movies)} movies with highest opening")
+        return HTMLResponse(content=f"<pre>{table}</pre>")
+
+    except Exception as e:
+        logger.error(f"Error fetching movies with highest opening: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
