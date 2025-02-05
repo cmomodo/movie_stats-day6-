@@ -10,7 +10,7 @@ This project is a simple API that provides information about movies. It includes
 
 ## System Design:
 
-![Box Office](../image/box_office.png)
+![System Design Diagram](/images/box_office.png)
 
 ### API Endpoints:
 
