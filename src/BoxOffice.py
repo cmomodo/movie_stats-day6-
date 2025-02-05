@@ -2,7 +2,7 @@ import os
 import requests
 import logging
 from typing import List, Optional
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Path
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
@@ -235,10 +235,10 @@ async def get_movies_rating(
         raise HTTPException(status_code=500, detail=str(e))
 
 #Sort latest movies by genre
-@app.get("/movies/genre", response_class=HTMLResponse)
+@app.get("/movies/genre/{genre}", response_class=HTMLResponse)
 async def get_movies_genre(
-    genre: str = Query(
-        default="Action",
+    genre: str = Path(
+        ...,
         description="Genre of the movie"
     ),
     limit: int = Query(
@@ -253,7 +253,7 @@ async def get_movies_genre(
         movies = imdb_client.get_box_office_movies()
 
         # Filter movies by genre
-        movies = [m for m in movies if genre in m.genres]
+        movies = [m for m in movies if genre.lower() in [g.lower() for g in m.genres]]
         movies = movies[:limit]
 
         # Format data for response
