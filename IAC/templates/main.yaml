@@ -1,86 +1,113 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Description: "Soccer Platform Infrastructure - 30 Days DevOps Challenge"
 
+# --- Parameters Section ---
+# This section defines the input parameters for the CloudFormation template.
+# These parameters allow you to customize the infrastructure deployment.
 Parameters:
   EnvironmentName:
-    Description: Environment name for resource tagging
+    Description: Environment name for resource tagging (e.g., dev, prod, staging)
     Type: String
     Default: dev
 
   VpcCIDR:
-    Description: CIDR block for VPC
+    Description: CIDR block for the VPC (Virtual Private Cloud)
     Type: String
     Default: 10.0.0.0/16
 
   PublicSubnet1CIDR:
-    Description: CIDR block for public subnet 1
+    Description: CIDR block for public subnet 1 (in first AZ)
     Type: String
     Default: 10.0.1.0/24
 
+  PublicSubnet2CIDR:
+    Description: CIDR block for public subnet 2 (in second AZ)
+    Type: String
+    Default: 10.0.3.0/24
+
   PrivateSubnet1CIDR:
-    Description: CIDR block for private subnet 1
+    Description: CIDR block for private subnet 1 (in first AZ)
     Type: String
     Default: 10.0.2.0/24
 
   DockerImage:
-    Description: Docker image for box office application
+    Description: Docker image for the box office (soccer stats) application
     Type: String
     Default: boxoffice-app
 
   ApiKey:
-    Description: API Key for imbd database.
+    Description: API Key for the IMDB (soccer stats) database.
     Type: String
-    NoEcho: true
+    NoEcho: true # This hides the value in the console for security
 
+# --- Resources Section ---
+# This section defines the AWS resources that will be created by the template.
 Resources:
-  # VPC Configuration
+  # --- VPC Configuration ---
+  # Creates a Virtual Private Cloud (VPC) to isolate your resources.
   VPC:
     Type: AWS::EC2::VPC
     Properties:
-      CidrBlock: !Ref VpcCIDR
-      EnableDnsHostnames: true
-      EnableDnsSupport: true
+      CidrBlock: !Ref VpcCIDR # Uses the VPC CIDR parameter
+      EnableDnsHostnames: true # Enable DNS hostnames for instances in the VPC
+      EnableDnsSupport: true # Enable DNS resolution within the VPC
       Tags:
         - Key: Name
-          Value: !Sub ${EnvironmentName}-vpc
+          Value: !Sub ${EnvironmentName}-vpc # Tags the VPC with the environment name
 
-  # Internet Gateway
+  # --- Internet Gateway ---
+  # Creates an Internet Gateway to allow resources in the public subnets to access the internet.
   InternetGateway:
     Type: AWS::EC2::InternetGateway
     Properties:
       Tags:
         - Key: Name
-          Value: !Sub ${EnvironmentName}-igw
+          Value: !Sub ${EnvironmentName}-igw # Tags the internet gateway
 
+  # --- VPC Gateway Attachment ---
+  # Attaches the Internet Gateway to the VPC.
   AttachGateway:
     Type: AWS::EC2::VPCGatewayAttachment
     Properties:
-      VpcId: !Ref VPC
-      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VPC # References the VPC created above
+      InternetGatewayId: !Ref InternetGateway # References the Internet Gateway created above
 
-  # Subnets
+  # --- Subnets ---
+  # Creates public and private subnets within the VPC.
   PublicSubnet1:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
-      CidrBlock: !Ref PublicSubnet1CIDR
-      AvailabilityZone: !Select [0, !GetAZs ""]
-      MapPublicIpOnLaunch: true
+      CidrBlock: !Ref PublicSubnet1CIDR # Uses the PublicSubnet1 CIDR parameter
+      AvailabilityZone: !Select [0, !GetAZs ""] # Selects the first availability zone
+      MapPublicIpOnLaunch: true # Assign public IPs to instances launched in this subnet
       Tags:
         - Key: Name
           Value: !Sub ${EnvironmentName}-public-subnet-1
+
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Ref PublicSubnet2CIDR # Uses the PublicSubnet2 CIDR parameter
+      AvailabilityZone: !Select [1, !GetAZs ""] # Selects the second availability zone
+      MapPublicIpOnLaunch: true # Assign public IPs to instances launched in this subnet
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-public-subnet-2
 
   PrivateSubnet1:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
-      CidrBlock: !Ref PrivateSubnet1CIDR
-      AvailabilityZone: !Select [0, !GetAZs ""]
+      CidrBlock: !Ref PrivateSubnet1CIDR # Uses the PrivateSubnet1 CIDR parameter
+      AvailabilityZone: !Select [0, !GetAZs ""] # Selects the first availability zone
       Tags:
         - Key: Name
           Value: !Sub ${EnvironmentName}-private-subnet-1
 
-  # Route Tables
+  # --- Route Tables ---
+  # Creates a public route table and a route to the internet gateway.
   PublicRouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
@@ -91,29 +118,32 @@ Resources:
 
   PublicRoute:
     Type: AWS::EC2::Route
-    DependsOn: AttachGateway
+    DependsOn: AttachGateway # Ensure the gateway is attached before creating the route
     Properties:
       RouteTableId: !Ref PublicRouteTable
-      DestinationCidrBlock: 0.0.0.0/0
+      DestinationCidrBlock: 0.0.0.0/0 # All traffic
       GatewayId: !Ref InternetGateway
 
+  # --- Subnet Route Table Association ---
+  # Associates the public subnets with the public route table.
   PublicSubnet1RouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
       SubnetId: !Ref PublicSubnet1
       RouteTableId: !Ref PublicRouteTable
 
-  # Security Groups
+  # --- Security Groups ---
+  # Creates security groups to control inbound and outbound traffic.
   ALBSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: Security group for ALB
+      GroupDescription: Security group for ALB (Application Load Balancer)
       VpcId: !Ref VPC
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 80
           ToPort: 80
-          CidrIp: 0.0.0.0/0
+          CidrIp: 0.0.0.0/0 # Allows HTTP traffic from anywhere
       Tags:
         - Key: Name
           Value: !Sub ${EnvironmentName}-alb-sg
@@ -127,16 +157,17 @@ Resources:
         - IpProtocol: tcp
           FromPort: 8000
           ToPort: 8000
-          SourceSecurityGroupId: !Ref ALBSecurityGroup
+          SourceSecurityGroupId: !Ref ALBSecurityGroup # Allows traffic from the ALB security group on port 8000
         - IpProtocol: tcp
           FromPort: 22
           ToPort: 22
-          CidrIp: 0.0.0.0/0
+          CidrIp: 0.0.0.0/0 # Allows SSH traffic from anywhere
       Tags:
         - Key: Name
           Value: !Sub ${EnvironmentName}-ec2-sg
 
-  # IAM Resources
+  # --- IAM Resources ---
+  # Creates IAM resources for the EC2 instance.
   EC2Role:
     Type: AWS::IAM::Role
     Properties:
@@ -146,10 +177,10 @@ Resources:
           - Effect: Allow
             Principal:
               Service: ec2.amazonaws.com
-            Action: sts:AssumeRole
+            Action: sts:AssumeRole # Allows EC2 instances to assume this role
       ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
-        - arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore # Allows SSM access
+        - arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy # Allows CloudWatch access
       Tags:
         - Key: Name
           Value: !Sub ${EnvironmentName}-ec2-role
@@ -158,17 +189,19 @@ Resources:
     Type: AWS::IAM::InstanceProfile
     Properties:
       Roles:
-        - !Ref EC2Role
+        - !Ref EC2Role # Associates the role with the instance profile
 
-  # Load Balancer Resources
+  # --- Load Balancer Resources ---
+  # Creates an Application Load Balancer (ALB) and related resources.
   ApplicationLoadBalancer:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
-      Scheme: internet-facing
+      Scheme: internet-facing # Makes the ALB accessible from the internet
       SecurityGroups:
         - !Ref ALBSecurityGroup
       Subnets:
         - !Ref PublicSubnet1
+        - !Ref PublicSubnet2
       Tags:
         - Key: Name
           Value: !Sub ${EnvironmentName}-alb
@@ -176,12 +209,12 @@ Resources:
   ALBTargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
-      HealthCheckPath: /health
+      HealthCheckPath: /health # The path for health checks
       HealthCheckPort: "8000"
-      Port: 8000
+      Port: 8000 # The port on the target instance
       Protocol: HTTP
       VpcId: !Ref VPC
-      TargetType: instance
+      TargetType: instance # Targets are instances
       Tags:
         - Key: Name
           Value: !Sub ${EnvironmentName}-tg
@@ -191,15 +224,16 @@ Resources:
     Properties:
       DefaultActions:
         - Type: forward
-          TargetGroupArn: !Ref ALBTargetGroup
+          TargetGroupArn: !Ref ALBTargetGroup # Forward traffic to the target group
       LoadBalancerArn: !Ref ApplicationLoadBalancer
-      Port: 80
+      Port: 80 # Listens on port 80
       Protocol: HTTP
 
-  # EC2 Instance
+  # --- EC2 Instance ---
+  # Creates an EC2 instance to host the soccer stats application.
   SoccerStatsInstance:
     Type: AWS::EC2::Instance
-    DependsOn: ALBTargetGroup
+    DependsOn: ALBTargetGroup # Ensures the target group exists before creating the instance
     Properties:
       InstanceType: t2.micro
       ImageId: ami-0c7217cdde317cfec # Amazon Linux 2023 AMI
@@ -207,7 +241,7 @@ Resources:
       SecurityGroupIds:
         - !Ref EC2SecurityGroup
       IamInstanceProfile: !Ref EC2InstanceProfile
-      UserData:
+      UserData: # User data to configure the instance on launch
         Fn::Base64: !Sub |
           #!/bin/bash -xe
           yum update -y
@@ -223,12 +257,13 @@ Resources:
         - Key: Name
           Value: !Sub ${EnvironmentName}-soccer-stats
 
-  # CloudWatch Resources
+  # --- CloudWatch Resources ---
+  # Creates CloudWatch resources for monitoring.
   AppLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: !Sub /aws/ec2/${EnvironmentName}-soccer-stats
-      RetentionInDays: 7
+      LogGroupName: !Sub /aws/ec2/${EnvironmentName}-soccer-stats # Log group name
+      RetentionInDays: 7 # Logs are retained for 7 days
 
   CPUUtilizationAlarm:
     Type: AWS::CloudWatch::Alarm
@@ -237,14 +272,16 @@ Resources:
       MetricName: CPUUtilization
       Namespace: AWS/EC2
       Statistic: Average
-      Period: 300
-      EvaluationPeriods: 2
-      Threshold: 80
+      Period: 300 # 5 minute periods
+      EvaluationPeriods: 2 # Evaluate over 10 minutes
+      Threshold: 80 # Threshold at 80% CPU utilization
       ComparisonOperator: GreaterThanThreshold
       Dimensions:
         - Name: InstanceId
           Value: !Ref SoccerStatsInstance
 
+# --- Outputs Section ---
+# This section defines the values that will be output by the CloudFormation stack.
 Outputs:
   VPC:
     Description: VPC ID
