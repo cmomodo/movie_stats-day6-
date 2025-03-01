@@ -33,7 +33,7 @@ Parameters:
   DockerImage:
     Description: Docker image for the box office (soccer stats) application
     Type: String
-    Default: boxoffice-app
+    Default: 449095351082.dkr.ecr.us-east-1.amazonaws.com/box-office-repo:latest
 
   ApiKey:
     Description: API Key for the IMDB (soccer stats) database.
@@ -181,6 +181,7 @@ Resources:
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore # Allows SSM access
         - arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy # Allows CloudWatch access
+        - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly # Added ECR read-only permissions
       Tags:
         - Key: Name
           Value: !Sub ${EnvironmentName}-ec2-role
@@ -237,22 +238,22 @@ Resources:
     Properties:
       InstanceType: t2.micro
       ImageId: ami-0c7217cdde317cfec # Amazon Linux 2023 AMI
+      KeyName: ec2_log # Replace with your key pair name
       SubnetId: !Ref PublicSubnet1
       SecurityGroupIds:
         - !Ref EC2SecurityGroup
       IamInstanceProfile: !Ref EC2InstanceProfile
       UserData: # User data to configure the instance on launch
         Fn::Base64: !Sub |
-          #!/bin/bash -xe
-          yum update -y
-          yum install -y docker
+          #!/bin/bash -xe         
+          apt update -y
+          apt install -y docker.io awscli
           systemctl start docker
           systemctl enable docker
-          usermod -a -G docker ec2-user
+          usermod -a -G docker ubuntu   # Changed from ec2-user to ubuntu (for Ubuntu AMIs)
+          aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 449095351082.dkr.ecr.us-east-1.amazonaws.com
           docker pull ${DockerImage}
-          docker run -d -p 8000:8000 \
-            -e RAPID_API_KEY=${ApiKey} \
-            ${DockerImage}
+          docker run -d -p 8000:8000 -e RAPID_API_KEY=${ApiKey} ${DockerImage}
       Tags:
         - Key: Name
           Value: !Sub ${EnvironmentName}-soccer-stats
