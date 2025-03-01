@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Set your stack name
-STACK_NAME="movie-platform"
+STACK_NAME="box-office6"
 
 echo "Starting cleanup of AWS resources..."
 

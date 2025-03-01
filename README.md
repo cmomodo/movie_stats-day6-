@@ -74,3 +74,46 @@ uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 docker build . -t boxoffice-app .
 docker run -p 8000:8000 --env-file .env --name BoxOfficeApp boxoffice-app
 ```
+
+### Login to ECR Repository:
+
+```
+aws ecr get-login-password | docker login --username AWS --password-stdin <AWS_ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com
+```
+
+### Push Docker Image to ECR:
+
+```
+docker tag boxoffice-app:latest <AWS_ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com/boxoffice-app:latest
+docker push <AWS_ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com/boxoffice-app:latest
+```
+
+### Rebuild image for M Series mac users:
+
+```
+docker buildx build --platform linux/amd64 -t boxoffice-app .
+docker tag boxoffice-app:latest 449095351082.dkr.ecr.us-east-1.amazonaws.com/box-office-repo:boxoffice1
+docker push 449095351082.dkr.ecr.us-east-1.amazonaws.com/box-office-repo:boxoffice1
+```
+
+Test EC2 instance:
+
+```
+to test if the application is running
+curl http://localhost:8000
+```
+
+```
+Check movies by rating
+curl http://localhost:8000/movies/rating
+```
+
+```
+Check movies by genre/Comedy
+curl http://localhost:8000/movies/genre/comedy
+```
+
+```
+Check movies by Highest Opening Gross
+curl http://localhost:8000/movies/highest_opening
+```

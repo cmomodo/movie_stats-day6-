@@ -1,0 +1,16 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Template to create an ECR repository
+
+Resources:
+  MyECRRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Sub "${AWS::StackName}-repo"
+
+Outputs:
+  RepositoryName:
+    Description: The name of the repository
+    Value: !Ref MyECRRepository
+  RepositoryArn:
+    Description: The ARN of the repository
+    Value: !GetAtt MyECRRepository.Arn
